@@ -226,12 +226,12 @@ def load_data():
 
 @st.cache_data
 def load_yearly_returns():
+    """전략별 연도별 수익률 (중앙값 기준)"""
     return pd.DataFrame({
         'Year': ['2020', '2021', '2022', '2023', '2024', '2025'],
-        'TQQQ': [110.3, 34.5, -23.3, 80.4, 25.3, 45.7],
-        'BTCUSDT': [610.9, 321.0, -36.9, 321.2, 226.2, 24.2],
-        'ETHUSDT': [476.8, 749.7, 177.1, 123.9, 196.3, 290.1],
-        'SOLUSDT': [0, 2379.2, 42.3, 778.4, 259.9, 97.4],
+        'TQQQ Sniper': [129.2, 64.1, -22.1, 77.6, 49.8, 40.6],
+        'Upbit': [567.2, 2060.8, 10.9, 87.8, 116.2, 36.0],
+        'Bitget Futures': [4307.2, 1147.9, -17.8, 449.9, 341.7, 79.5],
     })
 
 @st.cache_data
@@ -361,13 +361,81 @@ with tab1:
 
 # TAB 2: Performance
 with tab2:
-    st.markdown("### 📅 연도별 수익률 비교")
-    fig = go.Figure()
-    colors = {'TQQQ': '#6366f1', 'BTCUSDT': '#f59e0b', 'ETHUSDT': '#22c55e', 'SOLUSDT': '#ef4444'}
-    for col in ['TQQQ', 'BTCUSDT', 'ETHUSDT', 'SOLUSDT']:
-        fig.add_trace(go.Bar(name=col, x=yearly_returns['Year'], y=yearly_returns[col], marker_color=colors[col]))
-    fig.update_layout(barmode='group', height=450, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_color='#94a3b8')
-    st.plotly_chart(fig, use_container_width=True)
+    # 전략별 요약 통계
+    st.markdown("### 📊 전략별 요약 통계")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    strategy_stats = df.groupby('Strategy').agg({
+        'CAGR': ['mean', 'min', 'max'],
+        'MDD': 'mean',
+        'Sharpe': 'mean',
+        'Years': 'mean'
+    }).round(1)
+    
+    with col1:
+        st.markdown("#### 🔵 TQQQ Sniper")
+        st.metric("평균 CAGR", "26.7%")
+        st.metric("MDD", "-38.4%")
+        st.metric("Sharpe", "0.85")
+        st.metric("테스트 기간", "14.8년")
+    
+    with col2:
+        upbit_stats = df[df['Strategy'] == 'Upbit']
+        st.markdown("#### 🟢 Upbit (32코인)")
+        st.metric("평균 CAGR", f"{upbit_stats['CAGR'].mean():.1f}%", f"범위: {upbit_stats['CAGR'].min():.0f}~{upbit_stats['CAGR'].max():.0f}%")
+        st.metric("평균 MDD", f"{upbit_stats['MDD'].mean():.1f}%")
+        st.metric("평균 Sharpe", f"{upbit_stats['Sharpe'].mean():.2f}")
+        st.metric("평균 테스트 기간", f"{upbit_stats['Years'].mean():.1f}년")
+    
+    with col3:
+        bitget_stats = df[df['Strategy'] == 'Bitget Futures']
+        st.markdown("#### 🟠 Bitget Futures (4코인)")
+        st.metric("평균 CAGR", f"{bitget_stats['CAGR'].mean():.1f}%", f"범위: {bitget_stats['CAGR'].min():.0f}~{bitget_stats['CAGR'].max():.0f}%")
+        st.metric("평균 MDD", f"{bitget_stats['MDD'].mean():.1f}%")
+        st.metric("평균 Sharpe", f"{bitget_stats['Sharpe'].mean():.2f}")
+        st.metric("평균 테스트 기간", f"{bitget_stats['Years'].mean():.1f}년")
+    
+    st.markdown("---")
+    st.markdown("### 📅 전략별 연도별 수익률 비교")
+    
+    # 스케일 차이가 크므로 두 개 차트로 분리
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("#### TQQQ Sniper (안정형)")
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            name='TQQQ Sniper', 
+            x=yearly_returns['Year'], 
+            y=yearly_returns['TQQQ Sniper'],
+            marker_color=['#ef4444' if v < 0 else '#6366f1' for v in yearly_returns['TQQQ Sniper']],
+            text=[f"{v:.1f}%" for v in yearly_returns['TQQQ Sniper']],
+            textposition='outside'
+        ))
+        fig.update_layout(height=350, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_color='#94a3b8', showlegend=False, yaxis_title='수익률 (%)')
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        st.markdown("#### 암호화폐 전략 (고수익/고위험)")
+        fig = go.Figure()
+        fig.add_trace(go.Bar(name='Upbit', x=yearly_returns['Year'], y=yearly_returns['Upbit'], marker_color='#22c55e'))
+        fig.add_trace(go.Bar(name='Bitget', x=yearly_returns['Year'], y=yearly_returns['Bitget Futures'], marker_color='#f59e0b'))
+        fig.update_layout(barmode='group', height=350, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_color='#94a3b8', yaxis_title='수익률 (%)')
+        st.plotly_chart(fig, use_container_width=True)
+        st.caption("💡 2020-2021년 암호화폐 강세장에서 극단적인 수익률 기록")
+    
+    # 통합 비교 테이블
+    st.markdown("### 📊 연도별 수익률 상세")
+    yearly_display = yearly_returns.copy()
+    yearly_display.columns = ['연도', 'TQQQ Sniper (%)', 'Upbit (%)', 'Bitget (%)']
+    st.dataframe(
+        yearly_display.style.format({'TQQQ Sniper (%)': '{:.1f}', 'Upbit (%)': '{:.1f}', 'Bitget (%)': '{:.1f}'})
+        .background_gradient(subset=['TQQQ Sniper (%)'], cmap='RdYlGn', vmin=-50, vmax=150)
+        .background_gradient(subset=['Upbit (%)'], cmap='RdYlGn', vmin=-50, vmax=500)
+        .background_gradient(subset=['Bitget (%)'], cmap='RdYlGn', vmin=-50, vmax=500),
+        use_container_width=True
+    )
     
     st.markdown("### 🎯 리스크-수익률 분포")
     fig = px.scatter(filtered_df, x=filtered_df['MDD'].abs(), y='CAGR', size='Sharpe', color='Strategy', hover_name='Ticker', size_max=40, color_discrete_map={'TQQQ Sniper': '#6366f1', 'Upbit': '#22c55e', 'Bitget Futures': '#f59e0b'})
