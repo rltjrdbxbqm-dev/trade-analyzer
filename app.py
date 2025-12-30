@@ -1,7 +1,6 @@
 """
 📊 Trading Strategy Backtest Dashboard
 =====================================
-배포 URL: https://YOUR-APP.streamlit.app
 """
 
 import streamlit as st
@@ -9,7 +8,6 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 페이지 설정
@@ -23,7 +21,7 @@ st.set_page_config(
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 커스텀 CSS
+# 다크모드 호환 CSS
 # ═══════════════════════════════════════════════════════════════════════════════
 
 st.markdown("""
@@ -46,22 +44,74 @@ st.markdown("""
     
     .sub-header {
         font-size: 1rem;
-        color: #64748b;
+        color: #94a3b8;
         margin-top: 0.5rem;
         margin-bottom: 2rem;
     }
     
-    .stat-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 1.5rem;
-        border-radius: 1rem;
-        color: white;
-        text-align: center;
+    .highlight-box {
+        background: rgba(99, 102, 241, 0.15);
+        border-left: 4px solid #6366f1;
+        padding: 1rem 1.5rem;
+        border-radius: 0 0.5rem 0.5rem 0;
+        margin: 1rem 0;
+        color: inherit;
+    }
+    
+    .highlight-box h4 {
+        color: #818cf8;
+        margin-bottom: 0.5rem;
+    }
+    
+    .highlight-box ul {
+        margin: 0;
+        padding-left: 1.2rem;
+    }
+    
+    .highlight-box li {
+        margin-bottom: 0.3rem;
+    }
+    
+    .warning-box {
+        background: rgba(239, 68, 68, 0.15);
+        border-left: 4px solid #ef4444;
+        padding: 1rem 1.5rem;
+        border-radius: 0 0.5rem 0.5rem 0;
+        margin: 1rem 0;
+        color: inherit;
+    }
+    
+    .warning-box h4 {
+        color: #f87171;
+        margin-bottom: 0.5rem;
+    }
+    
+    .warning-box ul {
+        margin: 0;
+        padding-left: 1.2rem;
+    }
+    
+    .warning-box li {
+        margin-bottom: 0.3rem;
+    }
+    
+    .success-box {
+        background: rgba(34, 197, 94, 0.15);
+        border-left: 4px solid #22c55e;
+        padding: 1rem 1.5rem;
+        border-radius: 0 0.5rem 0.5rem 0;
+        margin: 1rem 0;
+        color: inherit;
+    }
+    
+    .success-box h4 {
+        color: #4ade80;
+        margin-bottom: 0.5rem;
     }
     
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
-        background-color: #f1f5f9;
+        background-color: rgba(100, 100, 100, 0.1);
         padding: 0.5rem;
         border-radius: 0.75rem;
     }
@@ -74,8 +124,7 @@ st.markdown("""
     }
     
     .stTabs [aria-selected="true"] {
-        background-color: white;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        background-color: rgba(99, 102, 241, 0.3);
     }
     
     div[data-testid="stMetricValue"] {
@@ -87,79 +136,96 @@ st.markdown("""
         font-size: 0.875rem;
     }
     
-    .highlight-box {
-        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-        border-left: 4px solid #6366f1;
-        padding: 1rem 1.5rem;
-        border-radius: 0 0.5rem 0.5rem 0;
-        margin: 1rem 0;
-    }
-    
-    .warning-box {
-        background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
-        border-left: 4px solid #ef4444;
-        padding: 1rem 1.5rem;
-        border-radius: 0 0.5rem 0.5rem 0;
-        margin: 1rem 0;
-    }
-    
     footer {visibility: hidden;}
     #MainMenu {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 데이터 로드
+# 데이터 로드 - 전체 37개 자산
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @st.cache_data
 def load_data():
-    """백테스트 결과 데이터"""
+    """백테스트 결과 데이터 - 전체 37개 자산"""
     data = {
-        'Strategy': ['TQQQ Sniper', 'Bitget Futures', 'Bitget Futures', 'Bitget Futures', 'Bitget Futures',
-                     'Upbit', 'Upbit', 'Upbit', 'Upbit', 'Upbit', 'Upbit', 'Upbit', 'Upbit', 'Upbit', 'Upbit',
-                     'Upbit', 'Upbit', 'Upbit', 'Upbit', 'Upbit', 'Upbit', 'Upbit', 'Upbit', 'Upbit', 'Upbit'],
-        'Ticker': ['TQQQ', 'SOLUSDT', 'SUIUSDT', 'ETHUSDT', 'BTCUSDT',
-                   'KRW-SUI', 'KRW-SOL', 'KRW-ETH', 'KRW-BTC', 'KRW-AVAX',
-                   'KRW-VET', 'KRW-SAND', 'KRW-HBAR', 'KRW-XRP', 'KRW-ADA',
-                   'KRW-POL', 'KRW-NEAR', 'KRW-THETA', 'KRW-MANA', 'KRW-ANKR',
-                   'KRW-DOT', 'KRW-DOGE', 'KRW-LINK', 'KRW-XLM', 'KRW-BCH'],
-        'CAGR': [26.65, 1911.81, 1162.43, 657.60, 417.06,
-                 540.26, 181.14, 140.52, 101.66, 216.14,
-                 223.26, 229.50, 209.28, 173.31, 170.85,
-                 178.98, 187.47, 159.82, 169.52, 159.05,
-                 132.68, 101.08, 118.04, 127.94, 69.32],
-        'MDD': [-38.39, -74.39, -62.94, -67.84, -63.21,
-                -46.10, -27.58, -27.78, -32.75, -33.18,
-                -59.31, -62.15, -57.38, -69.08, -51.46,
-                -32.79, -51.73, -59.23, -63.16, -60.64,
-                -54.32, -59.66, -47.56, -59.56, -51.92],
-        'Sharpe': [0.85, 2.54, 2.22, 2.11, 2.00,
-                   2.75, 2.16, 2.10, 2.10, 2.16,
-                   1.90, 1.69, 1.69, 1.56, 1.85,
-                   1.93, 1.82, 1.57, 1.36, 1.44,
-                   1.66, 1.35, 1.49, 1.44, 1.10],
-        'WinRate': [44.2, 19.0, 18.1, 20.0, 21.2,
-                    25.4, 18.4, 19.2, 23.5, 25.5,
-                    22.2, 20.9, 21.2, 18.0, 20.9,
-                    20.9, 21.9, 18.9, 19.4, 20.4,
-                    20.2, 20.8, 21.8, 15.6, 17.4],
-        'Years': [14.83, 5.06, 2.30, 5.83, 6.08,
-                  2.17, 3.64, 7.58, 7.72, 3.41,
-                  5.31, 4.53, 5.75, 8.07, 7.62,
-                  3.53, 3.46, 6.46, 6.53, 5.95,
-                  4.70, 4.33, 5.00, 8.05, 7.99],
-        'Trades': [688, 260, 64, 150, 176,
-                   98, 190, 246, 288, 300,
-                   342, 106, 336, 394, 284,
-                   268, 122, 220, 276, 238,
-                   263, 268, 380, 470, 405],
+        'Strategy': [
+            'TQQQ Sniper',
+            'Upbit', 'Upbit', 'Upbit', 'Upbit', 'Upbit', 'Upbit', 'Upbit', 'Upbit',
+            'Upbit', 'Upbit', 'Upbit', 'Upbit', 'Upbit', 'Upbit', 'Upbit', 'Upbit',
+            'Upbit', 'Upbit', 'Upbit', 'Upbit', 'Upbit', 'Upbit', 'Upbit', 'Upbit',
+            'Upbit', 'Upbit', 'Upbit', 'Upbit', 'Upbit', 'Upbit', 'Upbit', 'Upbit',
+            'Bitget Futures', 'Bitget Futures', 'Bitget Futures', 'Bitget Futures'
+        ],
+        'Ticker': [
+            'TQQQ',
+            'KRW-BONK', 'KRW-UNI', 'KRW-SUI', 'KRW-MNT', 'KRW-MOVE', 'KRW-AKT', 'KRW-IMX', 'KRW-ARB',
+            'KRW-VET', 'KRW-SAND', 'KRW-HBAR', 'KRW-GRT', 'KRW-AVAX', 'KRW-NEAR', 'KRW-SOL', 'KRW-THETA',
+            'KRW-MANA', 'KRW-XRP', 'KRW-ANKR', 'KRW-ADA', 'KRW-POL', 'KRW-CRO', 'KRW-DOT', 'KRW-MVL',
+            'KRW-ETH', 'KRW-WAXP', 'KRW-DOGE', 'KRW-XLM', 'KRW-LINK', 'KRW-AXS', 'KRW-BTC', 'KRW-BCH',
+            'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'SUIUSDT'
+        ],
+        'CAGR': [
+            26.65,
+            1225.53, 1274.97, 540.26, 549.67, 470.54, 219.14, 264.82, 238.12,
+            223.26, 229.50, 209.28, 208.65, 216.14, 187.47, 181.14, 159.82,
+            169.52, 173.31, 159.05, 170.85, 178.98, 155.29, 132.68, 154.95,
+            140.52, 124.63, 101.08, 127.94, 118.04, 105.48, 101.66, 69.32,
+            417.06, 657.60, 1911.81, 1162.43
+        ],
+        'MDD': [
+            -38.39,
+            -24.51, -19.54, -46.10, -37.59, -29.63, -21.08, -28.16, -28.60,
+            -59.31, -62.15, -57.38, -35.01, -33.18, -51.73, -27.58, -59.23,
+            -63.16, -69.08, -60.64, -51.46, -32.79, -49.15, -54.32, -52.96,
+            -27.78, -65.15, -59.66, -59.56, -47.56, -45.69, -32.75, -51.92,
+            -63.21, -67.84, -74.39, -62.94
+        ],
+        'Sharpe': [
+            0.85,
+            3.87, 3.43, 2.75, 2.68, 2.55, 2.10, 2.14, 2.17,
+            1.90, 1.69, 1.69, 2.02, 2.16, 1.82, 2.16, 1.57,
+            1.36, 1.56, 1.44, 1.85, 1.93, 1.58, 1.66, 1.50,
+            2.10, 1.05, 1.35, 1.44, 1.49, 1.25, 2.10, 1.10,
+            2.00, 2.11, 2.54, 2.22
+        ],
+        'WinRate': [
+            44.2,
+            22.7, 26.7, 25.4, 22.9, 16.5, 16.5, 22.5, 19.4,
+            22.2, 20.9, 21.2, 20.4, 25.5, 21.9, 18.4, 18.9,
+            19.4, 18.0, 20.4, 20.9, 20.9, 18.1, 20.2, 17.7,
+            19.2, 15.6, 20.8, 15.6, 21.8, 14.1, 23.5, 17.4,
+            21.2, 20.0, 19.0, 18.1
+        ],
+        'Years': [
+            14.83,
+            0.59, 0.48, 2.17, 1.15, 0.65, 1.14, 2.18, 2.25,
+            5.31, 4.53, 5.75, 2.21, 3.41, 3.46, 3.64, 6.46,
+            6.53, 8.07, 5.95, 7.62, 3.53, 5.04, 4.70, 4.91,
+            7.58, 6.68, 4.33, 8.05, 5.00, 4.53, 7.72, 7.99,
+            6.08, 5.83, 5.06, 2.30
+        ],
+        'Trades': [
+            688,
+            26, 16, 98, 20, 32, 58, 106, 140,
+            342, 106, 336, 70, 300, 122, 190, 220,
+            276, 394, 238, 284, 268, 238, 263, 122,
+            246, 412, 268, 470, 380, 112, 288, 405,
+            176, 150, 260, 64
+        ],
+        'TotalReturn': [
+            3220.82,
+            361.06, 253.59, 5475.43, 755.64, 209.55, 276.17, 1584.54, 1446.11,
+            50931.01, 22032.66, 66065.33, 1113.71, 4956.95, 3752.94, 4199.87, 47562.82,
+            64897.01, 335244.62, 28699.96, 199219.50, 3646.93, 11161.46, 5173.49, 9765.73,
+            77080.81, 22131.93, 1952.83, 75972.92, 4814.85, 2508.26, 22381.62, 6625.78,
+            2172122.17, 13297012.31, 390830189.47, 33748.45
+        ]
     }
     return pd.DataFrame(data)
 
 @st.cache_data
 def load_yearly_returns():
-    """연도별 수익률"""
     return pd.DataFrame({
         'Year': ['2020', '2021', '2022', '2023', '2024', '2025'],
         'TQQQ': [110.3, 34.5, -23.3, 80.4, 25.3, 45.7],
@@ -170,20 +236,19 @@ def load_yearly_returns():
 
 @st.cache_data
 def load_correlation():
-    """상관관계 매트릭스"""
-    tickers = ['TQQQ', 'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'KRW-BTC', 'KRW-ETH', 'KRW-SOL']
+    tickers = ['TQQQ', 'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'SUIUSDT', 'KRW-BTC', 'KRW-ETH', 'KRW-SOL']
     corr = np.array([
-        [1.00, 0.11, 0.19, 0.12, 0.10, 0.19, 0.13],
-        [0.11, 1.00, 0.40, 0.38, 0.73, 0.40, 0.34],
-        [0.19, 0.40, 1.00, 0.28, 0.37, 0.80, 0.29],
-        [0.12, 0.38, 0.28, 1.00, 0.33, 0.27, 0.84],
-        [0.10, 0.73, 0.37, 0.33, 1.00, 0.41, 0.34],
-        [0.19, 0.40, 0.80, 0.27, 0.41, 1.00, 0.30],
-        [0.13, 0.34, 0.29, 0.84, 0.34, 0.30, 1.00],
+        [1.00, 0.11, 0.19, 0.12, 0.06, 0.10, 0.19, 0.13],
+        [0.11, 1.00, 0.40, 0.38, 0.24, 0.73, 0.40, 0.34],
+        [0.19, 0.40, 1.00, 0.28, 0.21, 0.37, 0.80, 0.29],
+        [0.12, 0.38, 0.28, 1.00, 0.15, 0.33, 0.27, 0.84],
+        [0.06, 0.24, 0.21, 0.15, 1.00, 0.14, 0.16, 0.21],
+        [0.10, 0.73, 0.37, 0.33, 0.14, 1.00, 0.41, 0.34],
+        [0.19, 0.40, 0.80, 0.27, 0.16, 0.41, 1.00, 0.30],
+        [0.13, 0.34, 0.29, 0.84, 0.21, 0.34, 0.30, 1.00],
     ])
     return pd.DataFrame(corr, index=tickers, columns=tickers)
 
-# 데이터 로드
 df = load_data()
 yearly_returns = load_yearly_returns()
 corr_df = load_correlation()
@@ -196,28 +261,26 @@ with st.sidebar:
     st.markdown("## ⚙️ 필터 설정")
     st.markdown("---")
     
-    # 전략 필터
     strategies = st.multiselect(
         "🎯 전략 선택",
         options=['TQQQ Sniper', 'Upbit', 'Bitget Futures'],
         default=['TQQQ Sniper', 'Upbit', 'Bitget Futures']
     )
     
-    # 기간 필터
     min_years = st.slider("📅 최소 테스트 기간 (년)", 0.0, 15.0, 0.0, 0.5)
-    
-    # MDD 필터
     max_mdd = st.slider("⚠️ 최대 MDD (%)", -100, 0, -100)
     
     st.markdown("---")
     st.markdown("### 📊 데이터 정보")
     st.info(f"""
-    - **전략 수**: {len(df['Strategy'].unique())}개
-    - **자산 수**: {len(df)}개
-    - **기간**: 2010-2025
+    • 전략 수: **3개**  
+    • 총 자산: **37개**  
+    • TQQQ: 1개  
+    • Upbit: 32개 코인  
+    • Bitget: 4개 코인  
+    • 기간: 2011-2025
     """)
 
-# 필터 적용
 filtered_df = df[
     (df['Strategy'].isin(strategies)) &
     (df['Years'] >= min_years) &
@@ -229,10 +292,10 @@ filtered_df = df[
 # ═══════════════════════════════════════════════════════════════════════════════
 
 st.markdown('<p class="main-header">📊 Trading Strategy Backtest Dashboard</p>', unsafe_allow_html=True)
-st.markdown('<p class="sub-header">TQQQ Sniper • Upbit 암호화폐 • Bitget 선물 | 3개 전략 통합 분석</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-header">TQQQ Sniper • Upbit 32코인 • Bitget 선물 4코인 | 총 37개 자산 분석</p>', unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 핵심 지표 카드
+# 핵심 지표
 # ═══════════════════════════════════════════════════════════════════════════════
 
 col1, col2, col3, col4 = st.columns(4)
@@ -261,10 +324,7 @@ st.markdown("---")
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["📈 Overview", "📊 Performance", "⚠️ Risk", "🔗 Correlation", "💼 Portfolio"])
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # TAB 1: Overview
-# ═══════════════════════════════════════════════════════════════════════════════
-
 with tab1:
     col1, col2 = st.columns(2)
     
@@ -277,143 +337,92 @@ with tab1:
         fig = go.Figure()
         fig.add_trace(go.Bar(name='CAGR (%)', x=strategy_avg['Strategy'], y=strategy_avg['CAGR'], marker_color='#6366f1'))
         fig.add_trace(go.Bar(name='|MDD| (%)', x=strategy_avg['Strategy'], y=abs(strategy_avg['MDD']), marker_color='#ef4444'))
-        fig.update_layout(barmode='group', height=350, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
+        fig.update_layout(barmode='group', height=350, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_color='#94a3b8')
         st.plotly_chart(fig, use_container_width=True)
     
     with col2:
-        st.markdown("### 전략 분포")
+        st.markdown("### 전략별 자산 분포")
         count = filtered_df['Strategy'].value_counts()
-        fig = px.pie(values=count.values, names=count.index, hole=0.4, color_discrete_sequence=['#6366f1', '#22c55e', '#f59e0b'])
-        fig.update_layout(height=350)
+        fig = px.pie(values=count.values, names=count.index, hole=0.4, color_discrete_sequence=['#22c55e', '#f59e0b', '#6366f1'])
+        fig.update_layout(height=350, paper_bgcolor='rgba(0,0,0,0)', font_color='#94a3b8')
         st.plotly_chart(fig, use_container_width=True)
     
-    # Top 10 테이블
-    st.markdown("### 🏆 Top 10 Performance Rankings")
-    top10 = filtered_df.sort_values('CAGR', ascending=False).head(10)[['Ticker', 'Strategy', 'CAGR', 'MDD', 'Sharpe', 'WinRate', 'Years']]
-    
+    st.markdown("### 🏆 Top 15 Performance")
+    top_n = filtered_df.sort_values('CAGR', ascending=False).head(15)[['Ticker', 'Strategy', 'CAGR', 'MDD', 'Sharpe', 'WinRate', 'Years', 'Trades']]
     st.dataframe(
-        top10.style.format({
-            'CAGR': '{:.1f}%', 'MDD': '{:.1f}%', 'Sharpe': '{:.2f}', 'WinRate': '{:.1f}%', 'Years': '{:.1f}'
-        }).background_gradient(subset=['CAGR'], cmap='Greens')
-         .background_gradient(subset=['MDD'], cmap='Reds_r'),
-        use_container_width=True, height=400
+        top_n.style.format({'CAGR': '{:.1f}%', 'MDD': '{:.1f}%', 'Sharpe': '{:.2f}', 'WinRate': '{:.1f}%', 'Years': '{:.2f}'})
+        .background_gradient(subset=['CAGR'], cmap='Greens').background_gradient(subset=['MDD'], cmap='Reds_r'),
+        use_container_width=True, height=500
     )
+    
+    with st.expander("📋 전체 37개 자산 보기"):
+        full_df = filtered_df.sort_values('CAGR', ascending=False)[['Ticker', 'Strategy', 'CAGR', 'MDD', 'Sharpe', 'WinRate', 'Years', 'Trades', 'TotalReturn']]
+        st.dataframe(full_df.style.format({'CAGR': '{:.1f}%', 'MDD': '{:.1f}%', 'Sharpe': '{:.2f}', 'WinRate': '{:.1f}%', 'Years': '{:.2f}', 'TotalReturn': '{:,.1f}%'}), use_container_width=True, height=600)
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # TAB 2: Performance
-# ═══════════════════════════════════════════════════════════════════════════════
-
 with tab2:
     st.markdown("### 📅 연도별 수익률 비교")
-    
     fig = go.Figure()
     colors = {'TQQQ': '#6366f1', 'BTCUSDT': '#f59e0b', 'ETHUSDT': '#22c55e', 'SOLUSDT': '#ef4444'}
     for col in ['TQQQ', 'BTCUSDT', 'ETHUSDT', 'SOLUSDT']:
         fig.add_trace(go.Bar(name=col, x=yearly_returns['Year'], y=yearly_returns[col], marker_color=colors[col]))
-    fig.update_layout(barmode='group', height=450, plot_bgcolor='rgba(0,0,0,0)')
+    fig.update_layout(barmode='group', height=450, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_color='#94a3b8')
     st.plotly_chart(fig, use_container_width=True)
     
     st.markdown("### 🎯 리스크-수익률 분포")
-    fig = px.scatter(
-        filtered_df, x=filtered_df['MDD'].abs(), y='CAGR', 
-        size='Sharpe', color='Strategy', hover_name='Ticker',
-        size_max=40, color_discrete_map={'TQQQ Sniper': '#6366f1', 'Upbit': '#22c55e', 'Bitget Futures': '#f59e0b'}
-    )
-    fig.update_layout(height=450, xaxis_title='MDD (%, Absolute)', yaxis_title='CAGR (%)', plot_bgcolor='rgba(0,0,0,0)')
+    fig = px.scatter(filtered_df, x=filtered_df['MDD'].abs(), y='CAGR', size='Sharpe', color='Strategy', hover_name='Ticker', size_max=40, color_discrete_map={'TQQQ Sniper': '#6366f1', 'Upbit': '#22c55e', 'Bitget Futures': '#f59e0b'})
+    fig.update_layout(height=500, xaxis_title='MDD (%)', yaxis_title='CAGR (%)', plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_color='#94a3b8')
     st.plotly_chart(fig, use_container_width=True)
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # TAB 3: Risk
-# ═══════════════════════════════════════════════════════════════════════════════
-
 with tab3:
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown("### ⚠️ MDD 비교")
-        mdd_data = filtered_df.sort_values('MDD', ascending=True).head(15)
-        fig = go.Figure(go.Bar(
-            x=mdd_data['MDD'], y=mdd_data['Ticker'], orientation='h',
-            marker_color=[('#22c55e' if v > -40 else '#f59e0b' if v > -60 else '#ef4444') for v in mdd_data['MDD']]
-        ))
-        fig.update_layout(height=450, plot_bgcolor='rgba(0,0,0,0)')
+        st.markdown("### ⚠️ MDD 비교 (Top 20)")
+        mdd_data = filtered_df.sort_values('MDD', ascending=True).head(20)
+        fig = go.Figure(go.Bar(x=mdd_data['MDD'], y=mdd_data['Ticker'], orientation='h', marker_color=[('#22c55e' if v > -40 else '#f59e0b' if v > -60 else '#ef4444') for v in mdd_data['MDD']]))
+        fig.update_layout(height=550, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_color='#94a3b8')
         st.plotly_chart(fig, use_container_width=True)
     
     with col2:
-        st.markdown("### 🎯 Sharpe Ratio")
-        sharpe_data = filtered_df.sort_values('Sharpe', ascending=False).head(15)
-        fig = go.Figure(go.Bar(
-            x=sharpe_data['Sharpe'], y=sharpe_data['Ticker'], orientation='h',
-            marker_color=[('#22c55e' if v > 2 else '#f59e0b' if v > 1 else '#ef4444') for v in sharpe_data['Sharpe']]
-        ))
-        fig.update_layout(height=450, plot_bgcolor='rgba(0,0,0,0)')
+        st.markdown("### 🎯 Sharpe Ratio (Top 20)")
+        sharpe_data = filtered_df.sort_values('Sharpe', ascending=False).head(20)
+        fig = go.Figure(go.Bar(x=sharpe_data['Sharpe'], y=sharpe_data['Ticker'], orientation='h', marker_color=[('#22c55e' if v > 2 else '#f59e0b' if v > 1 else '#ef4444') for v in sharpe_data['Sharpe']]))
+        fig.update_layout(height=550, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font_color='#94a3b8')
         st.plotly_chart(fig, use_container_width=True)
     
-    # 리스크 등급
+    st.markdown("### 📊 리스크 등급")
     col1, col2, col3 = st.columns(3)
     safe = filtered_df[filtered_df['MDD'] > -40]
     caution = filtered_df[(filtered_df['MDD'] <= -40) & (filtered_df['MDD'] > -60)]
     danger = filtered_df[filtered_df['MDD'] <= -60]
     
     with col1:
-        st.success(f"🟢 안전: {len(safe)}개")
-        st.caption("MDD > -40%")
+        st.markdown(f'<div class="success-box"><h4>🟢 안전: {len(safe)}개</h4>MDD > -40%</div>', unsafe_allow_html=True)
     with col2:
-        st.warning(f"🟡 주의: {len(caution)}개")
-        st.caption("-60% < MDD ≤ -40%")
+        st.markdown(f'<div class="highlight-box"><h4>🟡 주의: {len(caution)}개</h4>-60% < MDD ≤ -40%</div>', unsafe_allow_html=True)
     with col3:
-        st.error(f"🔴 위험: {len(danger)}개")
-        st.caption("MDD ≤ -60%")
+        st.markdown(f'<div class="warning-box"><h4>🔴 위험: {len(danger)}개</h4>MDD ≤ -60%</div>', unsafe_allow_html=True)
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # TAB 4: Correlation
-# ═══════════════════════════════════════════════════════════════════════════════
-
 with tab4:
-    st.markdown("### 🔗 전략 간 상관관계 매트릭스")
-    
-    fig = px.imshow(
-        corr_df, labels=dict(color="Correlation"),
-        x=corr_df.columns, y=corr_df.index,
-        color_continuous_scale='RdYlGn', zmin=-1, zmax=1, text_auto='.2f'
-    )
-    fig.update_layout(height=500)
+    st.markdown("### 🔗 상관관계 매트릭스")
+    fig = px.imshow(corr_df, labels=dict(color="Correlation"), x=corr_df.columns, y=corr_df.index, color_continuous_scale='RdYlGn', zmin=-1, zmax=1, text_auto='.2f')
+    fig.update_layout(height=500, paper_bgcolor='rgba(0,0,0,0)', font_color='#94a3b8')
     st.plotly_chart(fig, use_container_width=True)
     
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown("""
-        <div class="highlight-box">
-        <h4>🔍 핵심 인사이트</h4>
-        <ul>
-            <li><strong>TQQQ ↔ 암호화폐</strong>: 0.06~0.19 (매우 낮음)</li>
-            <li><strong>동일 코인 Upbit/Bitget</strong>: 0.73~0.84 (높음)</li>
-            <li><strong>알트코인 간</strong>: 0.15~0.40 (중간)</li>
-        </ul>
-        </div>
-        """, unsafe_allow_html=True)
-    
+        st.markdown('<div class="highlight-box"><h4>🔍 핵심 인사이트</h4><ul><li><strong>TQQQ ↔ 암호화폐</strong>: 0.06~0.19 (매우 낮음)</li><li><strong>동일 코인 Upbit/Bitget</strong>: 0.73~0.84 (높음)</li><li><strong>SUIUSDT</strong>: 다른 자산과 0.06~0.24 (매우 낮음)</li></ul></div>', unsafe_allow_html=True)
     with col2:
-        st.markdown("""
-        <div class="highlight-box">
-        <h4>💡 시사점</h4>
-        <ul>
-            <li>✅ TQQQ + 암호화폐 = 최적 분산</li>
-            <li>❌ 동일 코인 중복 투자 비효율</li>
-            <li>⚠️ SUI, SOL은 분산 효과 우수</li>
-        </ul>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown('<div class="success-box"><h4>💡 시사점</h4><ul><li>✅ TQQQ + 암호화폐 = 최적 분산</li><li>✅ SUIUSDT는 분산 효과 탁월</li><li>❌ 동일 코인 중복 투자 비효율</li></ul></div>', unsafe_allow_html=True)
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # TAB 5: Portfolio
-# ═══════════════════════════════════════════════════════════════════════════════
-
 with tab5:
     st.markdown("### 💼 포트폴리오 구성 제안")
     
     col1, col2, col3 = st.columns(3)
-    
     portfolios = [
         {"name": "🐢 보수적", "tqqq": 50, "upbit": 35, "bitget": 15, "cagr": "50-80%", "mdd": "-25~35%"},
         {"name": "⚖️ 균형", "tqqq": 30, "upbit": 40, "bitget": 30, "cagr": "100-150%", "mdd": "-35~50%"},
@@ -423,16 +432,11 @@ with tab5:
     for col, p in zip([col1, col2, col3], portfolios):
         with col:
             st.markdown(f"#### {p['name']}")
-            fig = go.Figure(go.Pie(
-                labels=['TQQQ', 'Upbit', 'Bitget'],
-                values=[p['tqqq'], p['upbit'], p['bitget']],
-                hole=0.4, marker_colors=['#6366f1', '#22c55e', '#f59e0b']
-            ))
-            fig.update_layout(height=200, margin=dict(t=0, b=0, l=0, r=0), showlegend=True)
+            fig = go.Figure(go.Pie(labels=['TQQQ', 'Upbit', 'Bitget'], values=[p['tqqq'], p['upbit'], p['bitget']], hole=0.4, marker_colors=['#6366f1', '#22c55e', '#f59e0b']))
+            fig.update_layout(height=200, margin=dict(t=0, b=0, l=0, r=0), paper_bgcolor='rgba(0,0,0,0)', font_color='#94a3b8')
             st.plotly_chart(fig, use_container_width=True)
             st.markdown(f"**CAGR**: {p['cagr']} | **MDD**: {p['mdd']}")
     
-    # 커스텀 계산기
     st.markdown("---")
     st.markdown("### 🧮 커스텀 포트폴리오 계산기")
     
@@ -445,14 +449,9 @@ with tab5:
         w_bitget = 100 - w_tqqq - w_upbit
         st.metric("Bitget (%)", w_bitget)
     
-    # 예상 성과
     avg = df.groupby('Strategy').agg({'CAGR': 'mean', 'MDD': 'mean'})
-    exp_cagr = (w_tqqq/100 * avg.loc['TQQQ Sniper', 'CAGR'] + 
-                w_upbit/100 * avg.loc['Upbit', 'CAGR'] + 
-                w_bitget/100 * avg.loc['Bitget Futures', 'CAGR'])
-    exp_mdd = (w_tqqq/100 * avg.loc['TQQQ Sniper', 'MDD'] + 
-               w_upbit/100 * avg.loc['Upbit', 'MDD'] + 
-               w_bitget/100 * avg.loc['Bitget Futures', 'MDD'])
+    exp_cagr = (w_tqqq/100 * avg.loc['TQQQ Sniper', 'CAGR'] + w_upbit/100 * avg.loc['Upbit', 'CAGR'] + w_bitget/100 * avg.loc['Bitget Futures', 'CAGR'])
+    exp_mdd = (w_tqqq/100 * avg.loc['TQQQ Sniper', 'MDD'] + w_upbit/100 * avg.loc['Upbit', 'MDD'] + w_bitget/100 * avg.loc['Bitget Futures', 'MDD'])
     
     c1, c2, c3 = st.columns(3)
     with c1:
@@ -462,27 +461,8 @@ with tab5:
     with c3:
         st.metric("효율성", f"{exp_cagr/abs(exp_mdd):.2f}")
     
-    # 경고
-    st.markdown("""
-    <div class="warning-box">
-    <h4>⚠️ 투자 주의사항</h4>
-    <ul>
-        <li>과거 성과가 미래 수익을 보장하지 않습니다</li>
-        <li>단기 데이터 코인은 과적합 위험이 있습니다</li>
-        <li>실제 거래 시 슬리피지로 성과가 하락할 수 있습니다</li>
-    </ul>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown('<div class="warning-box"><h4>⚠️ 투자 주의사항</h4><ul><li>과거 성과가 미래 수익을 보장하지 않습니다</li><li>테스트 기간 1년 미만 코인은 과적합 위험이 높습니다</li><li>실제 거래 시 슬리피지로 성과가 하락할 수 있습니다</li></ul></div>', unsafe_allow_html=True)
 
-# ═══════════════════════════════════════════════════════════════════════════════
 # 푸터
-# ═══════════════════════════════════════════════════════════════════════════════
-
 st.markdown("---")
-st.markdown("""
-<div style='text-align: center; color: #94a3b8; padding: 1rem;'>
-    📊 Trading Strategy Backtest Dashboard<br>
-    Data: 2010-2025 | Built with Streamlit + Plotly<br>
-    <small>Last Updated: 2025-12-30</small>
-</div>
-""", unsafe_allow_html=True)
+st.markdown('<div style="text-align: center; color: #64748b; padding: 1rem;">📊 Trading Strategy Backtest Dashboard<br><strong>37개 자산</strong> | TQQQ 1 + Upbit 32 + Bitget 4 | 2011-2025</div>', unsafe_allow_html=True)
